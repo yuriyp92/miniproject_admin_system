@@ -1,0 +1,87 @@
+---
+- hosts: servers
+  vars_files:
+    - vars.yml
+  gather_facts: false
+  become: yes
+
+  tasks:
+    - name: Clone/pull project repo
+      git:
+        repo: "{{ project_repo }}"
+        dest: "{{ install_root }}/{{ project_name }}"
+        accept_hostkey: yes
+        force: yes
+      notify:
+      - restart gunicorn
+
+    - name: Install python packages
+      pip:
+        requirements: "{{ install_root }}/{{ project_name }}/requirements.txt"
+      notify:
+      - restart gunicorn
+
+    - name: Make manage.py executable
+      file:
+        path: "{{ install_root }}/{{ project_name }}/manage.py"
+        mode: 0777
+
+    - name: django migrate
+      django_manage:
+        command: migrate
+        app_path: "{{ install_root }}/{{ project_name }}"
+
+    - name: django load data
+      django_manage:
+        command: loaddata
+        app_path: "{{ install_root }}/{{ project_name }}"
+        fixtures: "{{ install_root }}/{{ project_name }}/{{ fixtures_file }}"
+
+    - name: copy nginx config
+      template:
+        src: files/nginx.j2
+        dest: "/etc/nginx/sites-enabled/{{ project_name }}.conf"
+      notify:
+      - restart nginx
+
+    - name: Activate the domain via symbolic link
+      file:
+        src: "/etc/nginx/sites-enabled/"
+        dest: "/etc/nginx/sites-available/{{ project_name }}.conf"
+        state: link
+      notify:
+      - restart nginx
+
+    - name: copy gunicorn config
+      template:
+        src: files/gunicorn.j2
+        dest: /etc/supervisor/conf.d/{{ supervisor_service }}.conf
+      notify:
+      - restart gunicorn
+
+    - name: gunicorn process exists in supervisor
+      supervisorctl:
+        name: django_polls-ansible
+        state: present
+
+    - name: make sure nginx server is running
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: restart gunicorn
+      supervisorctl:
+        name: django_polls-ansible
+        state: started
+
+  handlers:
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: restart gunicorn
+      supervisorctl:
+        name: django_polls-ansible
+        state: restarted
