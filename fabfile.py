@@ -3,7 +3,7 @@ import os
 from fabric import Connection, task
 
 PROJECT_NAME = "shield"
-PROJECT_PATH = f"~/{PROJECT_NAME}"
+PROJECT_PATH = f"~fab /{PROJECT_NAME}"
 REPO_URL = "https://github.com/yuriyp92/miniproject_admin_system.git"
 VENV_PYTHON = f'{PROJECT_PATH}/.venv/bin/python'
 VENV_PIP = f'{PROJECT_PATH}/.venv/bin/pip'
